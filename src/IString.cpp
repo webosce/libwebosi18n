@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2022 LG Electronics, Inc.
+// Copyright (c) 2013-2024 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,11 +28,12 @@
 #include <boost/algorithm/string.hpp>
 #include <stdlib.h>
 #include <sstream>
+#include <errno.h>
 using namespace std;
 
 IString::IString(const string source)
 {
-	text = source;
+	text = std::move(source);
 }
 
 string IString::format(map<string, string> values)
@@ -91,7 +92,7 @@ bool IString::equalsIgnoreCase(const string& source, const string& target) {
     }
 
     for (string::const_iterator c1 = source.begin(), c2 = target.begin(); c1 != source.end(); ++c1, ++c2) {
-        if (tolower(static_cast<int>(*c1)) != tolower(static_cast<int>(*c2))) {
+        if (tolower((unsigned char)*c1) != tolower((unsigned char)(*c2))) {
             return false;
         }
     }
@@ -101,7 +102,7 @@ bool IString::equalsIgnoreCase(const string& source, const string& target) {
 vector<string> IString::split(const string& source, const string& delimiter) {
     vector<string> result;
 
-    if (delimiter.empty()) {
+    if (delimiter.empty() || (delimiter.size() > LONG_MAX)) {
         result.push_back(source);
         return result;
     }
@@ -112,10 +113,11 @@ vector<string> IString::split(const string& source, const string& delimiter) {
         string tempSource(tempStart, tempEnd);
 
         if ( !tempSource.empty() ) {
-        	tempSource.erase(remove( tempSource.begin(), tempSource.end(), '\"' ),  tempSource.end());
-        	if (tempSource.at( tempSource.length() - 1 ) == ',')
-        		tempSource = tempSource.substr(0, tempSource.size() - 1);
-            result.push_back(tempSource);
+            tempSource.erase(remove( tempSource.begin(), tempSource.end(), '\"' ),  tempSource.end());
+            if ((tempSource.length() > 0) && (tempSource.at( tempSource.length() - 1 ) == ',')) {
+                tempSource = tempSource.substr(0, tempSource.size() - 1);
+            }
+            result.push_back(std::move(tempSource));
         }
 
         if ( tempEnd == source.end() ) break;
@@ -169,7 +171,7 @@ void IString::parseChoices() {
 
 //throws ParseException
 IString* IString::getChoice(bool reference) {
-	if ( text.empty() || text.length() == 0 ) {
+	if ( text.empty() || (text.length() == 0) ) {
 		return NULL;
 	}
 
@@ -205,7 +207,7 @@ IString* IString::getChoice(bool reference) {
 
 //throws ParseException
 IString* IString::getChoice(const string& reference) {
-	if ( text.empty() || text.length() == 0 ) {
+	if ( text.empty() || (text.length() == 0) ) {
 		return NULL;
 	}
 
@@ -222,7 +224,7 @@ IString* IString::getChoice(const string& reference) {
 		patterns = vector<boost::regex>();
 		for (i = 0; i < selectors.size(); i++) {
 			selector = selectors[i];
-			if (!selector.empty() && selector.length() > 0) {
+			if (!selector.empty() && (selector.length() > 0)) {
 				string pattern = selector;
 				boost::algorithm::to_lower(pattern);
 				patterns.push_back(boost::regex(selector));
@@ -257,7 +259,7 @@ IString* IString::getChoice(const string& reference) {
 
 //throws ParseException
 IString* IString::getChoice(double reference) {
-	if ( text.empty() || text.length() == 0 ) {
+	if ( text.empty() || (text.length() == 0) ) {
 		return NULL;
 	}
 
@@ -272,37 +274,38 @@ IString* IString::getChoice(double reference) {
 
 	for (i = 0; i < selectors.size(); i++) {
 		sel = selectors[i];
-		if ( sel.length() > 2 && sel.substr (0,2) == "<=" ) {
+		if ( (sel.length() > 2) && (sel.substr (0,2) == "<=") ) {
 			selector = parseDouble(sel.substr(2));
 			if (reference <= selector) {
 				result = new IString(strings[i]);
 				i = selectors.size();
 			}
-		} else if ( sel.length() > 2 && sel.substr(0,2) == ">=" ) {
+		} else if ( (sel.length() > 2) && (sel.substr(0,2) == ">=") ) {
 			selector = parseDouble(sel.substr(2));
 			if (reference >= selector) {
 				result = new IString(strings[i]);
 				i = selectors.size();
 			}
-		} else if ( sel.length() > 1 && sel.at(0) == '<' ) {
+		} else if ( (sel.length() > 1) && (sel.at(0) == '<') ) {
 			selector = parseDouble(sel.substr(1));
 			if (reference < selector) {
 				result = new IString(strings[i]);
 				i = selectors.size();
 			}
-		} else if ( sel.length() > 1 && sel.at(0) == '>' ) {
+		} else if ( (sel.length() > 1) && (sel.at(0) == '>') ) {
 			selector = parseDouble(sel.substr(1));
 			if (reference > selector) {
 				result = new IString(strings[i]);
 				i = selectors.size();
 			}
 		} else if ( sel.length() > 0 ) {
-			int value, dash = sel.find("-");
-			if ( dash != -1 ) {
+			size_t dash = sel.find("-");
+			int value;
+			if ( dash != string::npos ) {
 				// range
 				string start = sel.substr(0, dash);
 				string end = sel.substr(dash+1);
-				if (reference >= parseLong(start, 10) && reference <= parseLong(end, 10)) {
+				if ((reference >= parseLongToDouble(start, 10)) && (reference <= parseLongToDouble(end, 10))) {
 					result = new IString(strings[i]);
 					i = selectors.size();
 				}
@@ -311,7 +314,7 @@ IString* IString::getChoice(double reference) {
 					result = new IString(strings[i]);
 					i = selectors.size();
 				}
-			} else if ( equalDouble(reference, (double)parseLong(sel, 10)) ) {
+			} else if ( equalDouble(reference, parseLongToDouble(sel, 10)) ) {
 				// exact amount
 				result = new IString(strings[i]);
 				i = selectors.size();
@@ -328,23 +331,34 @@ IString* IString::getChoice(double reference) {
 }
 
 double IString::parseDouble(const string& digit_string) {
-	return atof( digit_string.c_str() );
+	char* pEnd;
+	const char* digitStr = digit_string.c_str();
+	errno = 0;
+	double d1 = strtod(digitStr, &pEnd);
+	return (errno != 0)? 0 : d1;
 }
 /**
  *
  */
-long IString::parseLong(const string& digit_string, int base) {
+double IString::parseLongToDouble(const string& digit_string, int base) {
 	char * pEnd;
-	return strtol(digit_string.c_str(), &pEnd, base);
+	const char* digitStr = digit_string.c_str();
+	errno = 0;
+	long l1 = strtol(digitStr, &pEnd, base);
+	if ((errno != 0) || (l1 < (LONG_MIN/100000)) || (l1 > (LONG_MAX/100000))) {
+		return 0;
+	} else {
+		return (double) l1;
+	}
 }
 
 
 bool IString::equalDouble(double value1, double value2) {
-	return (abs(value1 - value2) * 1000000000000. <= min(abs(value1), abs(value2)));
+	return ((abs(value1 - value2) * 1000000000000.) <= min(abs(value1), abs(value2)));
 }
 
 int IString::length() {
-	return text.length();
+	return (text.length() > INT_MAX)? INT_MAX: text.length();
 }
 
 const string& IString::toString() {
@@ -431,8 +445,12 @@ string IString::formatChoice(const string& message, long reference) {
 }
 
 string IString::formatChoice(const string& message, long reference, map<string, string> parameters) {
+	double dReference = 1.0;
+	if ((reference >= (LONG_MIN/10000)) && (reference <= (LONG_MAX/10000))) {
+		dReference = static_cast<double>(reference);
+	}
 	IString* iString = new IString(message);
-	string result = iString->formatChoice(static_cast<double>(reference), std::move(parameters));
+	string result = iString->formatChoice(dReference, std::move(parameters));
 	delete iString;
 	return result;
 }

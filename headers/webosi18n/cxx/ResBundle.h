@@ -136,7 +136,7 @@ class ResBundle {
 		/**
 		 * Initialize pseudo maps
 		 */
-		map< int, map<string, string> > initPseudoCharMap();
+		map< size_t, map<string, string> > initPseudoCharMap();
 
 	private:
 		/**
@@ -154,7 +154,7 @@ class ResBundle {
 		/**
 		 * Char maps for pseudo localization
 		 */
-		map< int, map<string, string> > pseudomap;
+		map< size_t, map<string, string> > pseudomap;
 };
 
 #endif  /* RESBUNDLE_H_ */

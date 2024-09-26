@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2018 LG Electronics, Inc.
+// Copyright (c) 2013-2024 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -350,7 +350,7 @@ class IString {
 		 * Parses digit sting to return a long value.
 		 * @return long value from difit string
 		 */
-		long parseLong(const string& digit_string, int base);
+		double parseLongToDouble(const string& digit_string, int base);
 		/**
 		 * Compares two given double values
 		 * @return true if two given values are equal

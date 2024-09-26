@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2023 LG Electronics, Inc.
+// Copyright (c) 2013-2024 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -257,7 +257,7 @@ const string& ResBundle::getLocale()
 vector<string> ResBundle::split(const string& source, const string& delimiter) {
 	vector<string> result;
 
-	if (delimiter.empty()) {
+	if (delimiter.empty() || (delimiter.size() > LONG_MAX)) {
 		result.push_back(source);
 		return result;
 	}
@@ -269,9 +269,10 @@ vector<string> ResBundle::split(const string& source, const string& delimiter) {
 
 		if ( !tempSource.empty() ) {
 			tempSource.erase(remove( tempSource.begin(), tempSource.end(), '\"' ),  tempSource.end());
-			if (tempSource.at( tempSource.length() - 1 ) == ',')
+			if ((tempSource.length() > 0) && (tempSource.at( tempSource.length() - 1 ) == ',')) {
 				tempSource = tempSource.substr(0, tempSource.size() - 1);
-			result.push_back(tempSource);
+			}
+			result.push_back(std::move(tempSource));
 		}
 
 		if ( tempEnd == source.end() ) break;
@@ -281,7 +282,7 @@ vector<string> ResBundle::split(const string& source, const string& delimiter) {
 	return result;
 }
 
-map< int, map<string, string> > ResBundle::initPseudoCharMap() {
+map< size_t, map<string, string> > ResBundle::initPseudoCharMap() {
 	string temp_json_path = PATH_TO_JSON;
 	WebOSLocale* webOSLocale = new WebOSLocale(locale);
 	string language = webOSLocale->getLanguage();
@@ -294,14 +295,14 @@ map< int, map<string, string> > ResBundle::initPseudoCharMap() {
 		files.push_back(temp_json_path + "/zxx/Cyrl/pseudomap.json");
 		files.push_back(temp_json_path + "/zxx/Hebr/pseudomap.json");
 		files.push_back(temp_json_path + "/zxx/Hans/pseudomap.json");
-	} else if (script.compare("Cyrl") == 0 || script.compare("Hebr") == 0) {
+	} else if ((script.compare("Cyrl") == 0) || (script.compare("Hebr") == 0)) {
 		files.push_back(temp_json_path + "/" + language + "/" + script + "/pseudomap.json");
 	} else {
 		files.push_back(temp_json_path + "/pseudomap.json");
 	}
 
-	map< int, map<string, string> > pseudomaps = map< int, map<string, string> >();
-	int num = 0;
+	map< size_t, map<string, string> > pseudomaps = map< size_t, map<string, string> >();
+	size_t num = 0;
 	list<string>::iterator li;
 
 	for (li=files.begin(); li!=files.end(); li++) {
@@ -334,6 +335,7 @@ map< int, map<string, string> > ResBundle::initPseudoCharMap() {
 		}
 
 		pseudomaps[num++] = std::move(temp_pseudomap);
+		if (num > files.size()) break;
 	}
 
 	return pseudomaps;
